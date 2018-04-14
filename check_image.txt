@@ -1,0 +1,160 @@
+#!/usr/bin/env python
+
+import sys
+import time
+import boto3
+import requests
+import operator
+import re
+import argparse
+from tendo import singleton
+
+
+###################################################################
+
+
+url="https://www.example.com/aLkp33tMznbJTu72/"
+
+sg=['sg-5e246a39','sg-83e7ebe5']
+ec2image={'ImageId':'ami-c8d481b4',
+                'KeyName':'key',
+                'InstanceType':'t2.small',
+                'SubnetId':'subnet-a7766ec5',
+                'PublicIp':'123.123.123.123',
+                'Regex':'[Dd][Ee][Vv]-[Pp][Rr][Oo][Xx][Yy]-[Nn][Gg][Ss][Bb]\d\d'
+        }
+
+interval=20
+
+
+###################################################################
+
+def check(ec2image):
+        ami=latestimage(ec2image['Regex'])
+
+        if len(ami)==0:
+                print "Default AMI:",ec2image['ImageId']
+        else:
+                print "Latest AMI:",ami[0][1],"#",ami[0][0]
+
+def mail(subject,message):
+        sns = boto3.client('sns')
+
+        response = sns.publish(TargetArn='arn:aws:sns:ap-southeast-1:000000000000:Infra:03f8e8d2-92a7-46e7-9fc7-f5ef49aa5229',
+                        Subject=subject,Message=message)
+
+        print response
+        return
+
+
+
+def latestimage(Regex):
+
+        ec2=boto3.client('ec2')
+        output=ec2.describe_images(Filters=[{'Name':'owner-id','Values':['000000000000']}])
+        new=sorted(output['Images'],key=operator.itemgetter('CreationDate'),reverse=True)
+        latest=[]
+        for i in new:
+                find=re.search(Regex,i['Name'])
+                if find:
+                        latest.append([i['Name'],i['ImageId'],i['CreationDate']])
+                        break
+#       print i['Name'],i['ImageId'],"#####",i['CreationDate']
+
+        return latest
+
+def failover(ec2image,image,sg):
+
+        global interval
+
+        ec2=boto3.client("ec2")
+        output=ec2.run_instances(ImageId=image,KeyName=ec2image['KeyName'],InstanceType=ec2image['InstanceType'],
+                        SecurityGroupIds=sg,MaxCount=1,MinCount=1,SubnetId=ec2image['SubnetId'])
+
+        print output
+        inst=output['Instances'][0]['InstanceId']
+
+        inst_state =""
+
+        for i in range(100):
+                output=ec2.describe_instance_status(InstanceIds=[inst])
+
+                try:
+                        inst_state=output['InstanceStatuses'][0]['InstanceState']['Name']
+                        if inst_state == 'running':
+                                break
+                except:
+                        pass
+                time.sleep(interval)
+                print inst_state
+
+        print "\n\nInstances started and running\n\n"
+
+        ip=ec2.associate_address(InstanceId=inst,PublicIp=ec2image['PublicIp'])
+
+        return [ip,inst]
+
+
+
+def main():
+
+
+        state=0
+        sample=3
+        global interval
+        global ec2image,url,sg
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+
+        parser = argparse.ArgumentParser(description='Image Launcher')
+        parser.add_argument('-c','--check', action='store_true',dest='check',default=False,help='Check the AMI image')
+        results = parser.parse_args()
+        if results.check:
+                check(ec2image)
+                exit(0)
+
+        me=singleton.SingleInstance()
+
+        while 1:
+                try:
+                        r=requests.get(url,timeout=5,headers=headers)
+                        code=r.status_code
+                        print "%s is up,return code: %d %d" %(url,code,state)
+                        state=0
+                except (requests.exceptions.ConnectionError,
+                        requests.exceptions.Timeout) as e:
+                        print e
+                        state=state+1
+                except:
+                        print "error!"
+                        state=state+1
+                if state >=sample:
+                        break
+                time.sleep(interval)
+
+        ami=latestimage(ec2image['Regex'])
+
+        mail("Critical:URL failed:"+url,url)
+
+        if len(ami)==0:
+                print "Default AMI:",ec2image['ImageId']
+                failresult=failover(ec2image,ec2image['ImageId'],sg)
+        else:
+                print "Latest AMI:",ami[0][1]
+                failresult=failover(ec2image,ami[0][1],sg)
+
+        print failresult
+
+        for i in range(10):
+                try:
+                        r=requests.get(url,timeout=5,headers=headers)
+                        code=r.status_code
+                        print "%s is up,return code: %d" %(url,code)
+                except (requests.exceptions.ConnectionError,
+                        requests.exceptions.Timeout) as e:
+                        print e
+                except:
+                        print "error!"
+                time.sleep(interval)
+
+if __name__ == '__main__':
+    main()
