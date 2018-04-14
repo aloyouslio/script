@@ -2,7 +2,6 @@
 $file = "$env:temp\ConfigureRemotingForAnsible.ps1"
 invoke-webrequest -uri $url -outfile $file
 powershell.exe -ExecutionPolicy ByPass -File $file
-
 $result=winrm enumerate winrm/config/Listener
 write-output $result
 $result=$result -match '([0-9]|[A-F]){40}'
