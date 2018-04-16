@@ -5,11 +5,11 @@ param
 (
 	[Parameter(Mandatory=$true)]
 	[ValidatePattern(".*@example.com")][String]$email,
-    [ValidatePattern(".*@example.com")][String]$manager,
+    	[ValidatePattern(".*@example.com")][String]$manager,
 	[String]$dept,
 	[String]$title,
 
-    [Parameter(Mandatory=$false)]
+    	[Parameter(Mandatory=$false)]
 	[ValidateSet("sg","in")][String]$office = "sg",
 	[ValidatePattern("^(\+)?\d{8,10}")][String]$hp = ""
 )
@@ -28,7 +28,7 @@ if($office -eq "sg")
 }
 elseif($office -eq "in")
 {
-		Add-DistributionGroupMember "Group Nongsa" -member $email
+		Add-DistributionGroupMember "Group In" -member $email
         
         $country="indonesa"
 }
