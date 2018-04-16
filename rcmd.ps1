@@ -1,4 +1,4 @@
-#rcmd get-childitem
+#rcmd Get-ChildItem
 
 param
 (
