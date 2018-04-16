@@ -24,12 +24,11 @@ $country="singapore"
 
 if($office -eq "sg")
 {
-		Add-DistributionGroupMember "Group SG" -member $email
+	Add-DistributionGroupMember "Group SG" -member $email
 }
 elseif($office -eq "in")
 {
-		Add-DistributionGroupMember "Group In" -member $email
-        
+	Add-DistributionGroupMember "Group In" -member $email
         $country="indonesa"
 }
 
