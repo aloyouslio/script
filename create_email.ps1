@@ -1,6 +1,5 @@
 ﻿#create_email.ps1 -email new@example.com -dept "Infrastructure" -title "System Engineer" -manager admin@example.com -hp +6512345678
 
-
 param
 (
 	[Parameter(Mandatory=$true)]
@@ -31,7 +30,6 @@ elseif($office -eq "in")
 	Add-DistributionGroupMember "Group In" -member $email
         $country="indonesa"
 }
-
 
 if($hp -eq "")
 {
